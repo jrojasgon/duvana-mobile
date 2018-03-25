@@ -1,0 +1,166 @@
+package inope.com.toolrepo.activity.utils;
+
+
+import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.TextView;
+import android.widget.Toast;
+
+
+
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.Arrays;
+import java.util.List;
+
+import inope.com.toolrepo.R;
+import inope.com.toolrepo.adapters.SpinnerArrayAdapter;
+import inope.com.toolrepo.beans.ClientBean;
+import inope.com.toolrepo.beans.SinkBean;
+import inope.com.toolrepo.beans.UserBean;
+import inope.com.toolrepo.enums.SinkDiameterEnum;
+import inope.com.toolrepo.enums.SinkPlumbOptionEnum;
+import inope.com.toolrepo.enums.SinkStatusEnum;
+import inope.com.toolrepo.enums.SinkTypeEnum;
+
+import static android.preference.PreferenceManager.getDefaultSharedPreferences;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+
+public final class ActivityUtils {
+
+    private static final String REQUIRED_FIELD = "Campo obligatorio";
+    private static final String REQUIRED_PHOTO = "Foto obligatoria";
+
+    private ActivityUtils() {
+    }
+
+    public static void showToastMessage(String message, Context context) {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT)
+                .show();
+    }
+
+    public static void showToastMessageLong(String message, Context context) {
+        Toast.makeText(context, message, Toast.LENGTH_LONG)
+                .show();
+    }
+
+    public static void initTypeSpinner(Spinner spinner, Context context) {
+        List<String> types = Arrays.asList(StringUtils.EMPTY, SinkTypeEnum.COVENTIONAL.getLabel(), SinkTypeEnum.LATERAL.getLabel(), SinkTypeEnum.TRANSVERSAL.getLabel());
+        spinner.setAdapter(new SpinnerArrayAdapter(context, types));
+    }
+
+    public static void initStateSpinner(Spinner spinner, Context context) {
+        List<String> status = Arrays.asList(StringUtils.EMPTY, SinkStatusEnum.BAD.getLabel(), SinkStatusEnum.GOOD.getLabel(), SinkStatusEnum.MODERATE.getLabel());
+        spinner.setAdapter(new SpinnerArrayAdapter(context, status));
+    }
+
+    public static void initDiameterSpinner(Spinner spinner, Context context) {
+        List<String> diameters = Arrays.asList(StringUtils.EMPTY, SinkDiameterEnum.EIGHT.getLabel(), SinkDiameterEnum.TEN.getLabel(), SinkDiameterEnum.TWELVE.getLabel());
+        spinner.setAdapter(new SpinnerArrayAdapter(context, diameters));
+    }
+
+    public static void initPlumbSpinner(Spinner spinner, Context context) {
+        List<String> options = Arrays.asList(StringUtils.EMPTY, SinkPlumbOptionEnum.YES.getLabel(), SinkPlumbOptionEnum.NO.getLabel());
+        spinner.setAdapter(new SpinnerArrayAdapter(context, options));
+    }
+
+    public static ProgressDialog createProgressDialog(String message, final Activity activity) {
+        ProgressDialog dialog = new ProgressDialog(activity);
+        dialog.setProgressStyle(ProgressDialog.BUTTON_NEUTRAL);
+        dialog.setMessage(message);
+        dialog.show();
+        return dialog;
+    }
+
+    public static void mapSpinner(Spinner spinner, List<String> elements, Context context) {
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(context,
+                android.R.layout.simple_spinner_dropdown_item, elements);
+        spinner.setAdapter(adapter);
+    }
+
+    public static String getStringPreference(final Activity activity, int id, String name) {
+        SharedPreferences sharedPref = getDefaultSharedPreferences(activity.getApplicationContext());
+        String defaultValue = activity.getResources().getString(id);
+        return sharedPref.getString(name, defaultValue);
+    }
+
+    public static void setDefaultClient(SinkBean sinkBean, final Activity activity, String name) {
+        String clientName = getStringPreference(activity, R.string.client_name_preference, name);
+        ClientBean clientBean = new ClientBean(clientName);
+        sinkBean.setClient(clientBean);
+    }
+
+    public static ClientBean getCurrentClient(final Activity activity) {
+        String clientName = ActivityUtils.getStringPreference(activity, R.string.client_name_preference, activity.getString(R.string.client_name_preference));
+        return new ClientBean(clientName);
+    }
+
+    public static UserBean getCurrentUser(final Activity activity) {
+        String imeNumber = ActivityUtils.getStringPreference(activity, R.string.imei_name_preference, activity.getString(R.string.imei_name_preference));
+        return new UserBean(imeNumber);
+    }
+
+    public static String getCurrentUserProfile(final Activity activity) {
+        return ActivityUtils.getStringPreference(activity, R.string.profile_name_preference, activity.getString(R.string.profile_name_preference));
+    }
+
+    public static boolean isNumeric(EditText editText, EditText errorTxt) {
+        errorTxt.setError(null);
+
+        if (!StringUtils.isNumeric(editText.getText().toString().trim())) {
+            return setError(errorTxt);
+        }
+        return true;
+    }
+
+    public static boolean hasText(EditText editText, EditText errorTxt) {
+
+        errorTxt.setError(null);
+
+        // text required and editText is blank, so return false
+        if (isEmpty(editText.getText().toString().trim())) {
+            return setError(errorTxt);
+        }
+
+        return true;
+    }
+
+    public static boolean isValidSpinner(Spinner spinner, TextView textView) {
+        textView.setError(null);
+        if (spinner.getSelectedItem().toString().equals(StringUtils.EMPTY)) {
+            textView.setError(REQUIRED_FIELD);
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean setError(EditText editText) {
+        editText.setError(REQUIRED_FIELD);
+        return false;
+    }
+
+    public static boolean photoExists(String encodedImage, Button button) {
+        button.setError(null);
+        boolean imageExists = isNotEmpty(encodedImage);
+        if (!imageExists) {
+            button.setError(REQUIRED_PHOTO);
+        }
+        return imageExists;
+    }
+
+    public static boolean isNetworkAvailable(Context context) {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+}

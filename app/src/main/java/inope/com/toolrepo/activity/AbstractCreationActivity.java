@@ -1,0 +1,293 @@
+package inope.com.toolrepo.activity;
+
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.os.Bundle;
+import android.os.Parcelable;
+import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
+
+
+
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
+
+import java.util.List;
+
+import javax.inject.Inject;
+
+import inope.com.toolrepo.AbstractNavigationActivity;
+import inope.com.toolrepo.R;
+import inope.com.toolrepo.activity.utils.ActivityUtils;
+import inope.com.toolrepo.beans.ClientReferenceBean;
+import inope.com.toolrepo.beans.SinkBean;
+import inope.com.toolrepo.constants.SinkConstants;
+import inope.com.toolrepo.dao.ReferenceClientDao;
+import inope.com.toolrepo.injectors.Injector;
+import inope.com.toolrepo.services.CustomService;
+import inope.com.toolrepo.tasks.HttpRequestSearchPairReferenceClientTask;
+import inope.com.toolrepo.tasks.HttpRequestSendBeanTask;
+import inope.com.toolrepo.utils.ImageUtils;
+
+import static inope.com.toolrepo.activity.utils.ActivityUtils.showToastMessage;
+import static inope.com.toolrepo.constants.SinkConstants.PHOTO_REQUEST_CODE;
+
+
+public abstract class AbstractCreationActivity extends AbstractNavigationActivity {
+
+    private Bitmap imageBitmap;
+
+    private ReferenceClientDao clientDao;
+
+    private String profilePreference;
+
+    @Inject
+    CustomService customService;
+
+    protected abstract void customInitialize();
+
+    protected abstract boolean createSinkBean(SinkBean sinkBean);
+
+    protected abstract ImageView getImageView();
+
+    protected abstract SinkBean getSinkBeanToSave();
+
+    protected abstract boolean isModeEdition();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // inject dependecies
+        Injector.getInstance().getAppComponent().inject(this);
+        initialize();
+        clientDao =  new ReferenceClientDao(this);
+        profilePreference = ActivityUtils.getStringPreference(this, R.string.profile_name_preference, getString(R.string.profile_name_preference));
+
+    }
+
+    private void initialize() {
+        customInitialize();
+    }
+
+    protected void addSaveSendLaterButtonListener(Button button) {
+
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                SinkBean sinkBean = getSinkBeanToSave();
+                Context context = getBaseContext();
+                if (createSinkBean(sinkBean)) {
+                    // check reference-client does not exist
+                    if(!referenceExistsInLocal(sinkBean)) {
+                        checkExistsInBd(sinkBean, true);
+                    } else {
+                        // showError
+                        createAlertReferenceDialog();
+                    }
+                } else {
+                    // Message d'error
+                    showToastMessage(getString(R.string.required_fields_empty_message), context);
+                }
+            }
+        });
+    }
+
+    private void checkExistsInBd(final SinkBean sinkBean, final boolean createFile) {
+
+        if(ActivityUtils.isNetworkAvailable(this)) {
+            new HttpRequestSearchPairReferenceClientTask(sinkBean, getBaseContext()) {
+                ProgressDialog dialog;
+
+                @Override
+                protected void onPostExecute(Boolean pairReferenceClientExists) {
+                    dialog.dismiss();
+                    if(BooleanUtils.toBoolean(pairReferenceClientExists)){
+                        createAlertReferenceDialog();
+                    } else if (createFile){
+                        createFileWithSinkData(sinkBean);
+                    }
+                }
+
+                @Override
+                protected void onPreExecute() {
+                    dialog = createDialog(getString(R.string.wait_default_message));
+                }
+            }.execute();
+        } else {
+            createFileWithSinkData(sinkBean);
+        }
+    }
+
+    private void createFileWithSinkData(SinkBean sinkBean) {
+        boolean fileCreated = customService.createAndSaveFile(sinkBean, getBaseContext());
+        if (fileCreated) {
+            setResultActivity();
+            addReferenceAndClientToDb(sinkBean);
+            finish();
+        } else {
+            showToastMessage(getString(R.string.try_later_message), getBaseContext());
+        }
+    }
+
+    protected void setResultActivity() {
+        showToastMessage(getString(R.string.success_save_message), getBaseContext());
+        if (getParent() == null) {
+            setResult(SinkConstants.EDITION_ACTIVITY_RESULT_CODE, new Intent());
+        } else {
+            getParent().setResult(SinkConstants.EDITION_ACTIVITY_RESULT_CODE, new Intent());
+        }
+    }
+
+    protected void addCameraButtonListener(Button cameraButton) {
+
+        cameraButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //Intent openChoice = new Intent(getBaseContext(), PhotoChoiceActivity.class);
+                //startActivityForResult(openChoice, PHOTO_REQUEST_CODE);
+            }
+        });
+    }
+
+    protected void onActivityResult(int requestCode, int resultCode, final Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        new Thread(new Runnable() {
+            public void run() {
+                if (data != null && data.getExtras() != null &&  data.getStringExtra(SinkConstants.INTENT_EXTRA_FULL_SIZE_FILE_NAME) != null) {
+                    final Bitmap bitmap = ImageUtils.getThumbnailBitmap(data.getStringExtra(SinkConstants.INTENT_EXTRA_FULL_SIZE_FILE_NAME));
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            // This code will always run on the UI thread, therefore is safe to modify UI elements.
+                            if (bitmap != null) {
+                                // set tag with image's path. It's used to upload the original image
+                                getImageView().setTag(data.getStringExtra(SinkConstants.INTENT_EXTRA_FULL_SIZE_FILE_NAME));
+                                getImageView().setImageBitmap(bitmap);
+                                getImageView().setDrawingCacheEnabled(true);
+                                imageBitmap = bitmap;
+                            }
+                        }
+                    });
+                } else {
+                    //FirebaseCrash.log("Error while taking or choosing photo");
+                    Log.e("this","Error while taking or choosing photo");
+                }
+            }
+
+        }).start();
+    }
+
+    protected void runTask(final SinkBean sink, final boolean checkReferenceExists, final boolean updateAll) {
+
+        if(referenceExistsInLocal(sink) && !isModeEdition() && sink.getId() == null) {
+            // showError
+            createAlertReferenceDialog();
+        } else {
+            new HttpRequestSendBeanTask(sink, getBaseContext(), ActivityUtils.getCurrentUser(this), checkReferenceExists, updateAll) {
+
+                ProgressDialog dialog;
+
+                @Override
+                protected void onPostExecute(Long id) {
+                    dialog.dismiss();
+
+                    if (id == null) {
+                        showToastMessage(getString(R.string.try_later_message), getBaseContext());
+                    } else if (id == 0L) {
+                        createAlertReferenceDialog();
+                    } else {
+                        setResultActivity();
+                        finish();
+                    }
+                }
+
+                @Override
+                protected void onPreExecute() {
+                    dialog = createDialog(getString(R.string.sending_default_message));
+                }
+            }.execute();
+        }
+
+    }
+
+    private void createAlertReferenceDialog() {
+        DialogInterface.OnClickListener dialogClickListener = new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int choice) {
+                switch (choice) {
+                    case DialogInterface.BUTTON_POSITIVE:
+                        getReferenceEditText().setError(getString(R.string.reference_exists_message));
+                        break;
+                }
+            }
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage(getString(R.string.reference_exists_error_message))
+                .setPositiveButton(R.string.ok, dialogClickListener)
+                .setCancelable(false).show();
+    }
+
+    private ProgressDialog createDialog(String message) {
+        return ActivityUtils.createProgressDialog(message, this);
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        savedInstanceState.putParcelable("BitmapImage", imageBitmap);
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        Parcelable parcelable = savedInstanceState.getParcelable("BitmapImage");
+        if (parcelable != null) {
+            Bitmap bitmapImage = (Bitmap) parcelable;
+            getImageView().setImageBitmap(bitmapImage);
+            getImageView().setDrawingCacheEnabled(true);
+        }
+    }
+
+    private void addReferenceAndClientToDb(SinkBean sinkBean) {
+        ReferenceClientDao clientDao = new ReferenceClientDao(getBaseContext());
+        clientDao.open();
+        ClientReferenceBean clientReferenceBean = new ClientReferenceBean(sinkBean.getReference(), sinkBean.getClient().getName(), sinkBean.getFileName(), profilePreference);
+        if(isModeEdition()) {
+            List<ClientReferenceBean> results = clientDao.getByFileName(sinkBean.getFileName());
+            if(CollectionUtils.isNotEmpty(results) && CollectionUtils.size(results) == 1) {
+                clientReferenceBean.setId(results.get(0).getId());
+                clientDao.update(clientReferenceBean);
+            } else {
+                Log.e("AbsCreationActivity", "It exists many entries with same file name! Weird!");
+            }
+        } else {
+            clientDao.add(clientReferenceBean);
+        }
+        clientDao.close();
+    }
+
+    protected boolean referenceExistsInLocal(SinkBean sinkBean) {
+        clientDao.open();
+        ClientReferenceBean bean = clientDao.getByReferenceAndClientName(sinkBean.getReference(), sinkBean.getClient().getName(), profilePreference);
+        clientDao.close();
+        if(isModeEdition()) {
+            return bean != null && !bean.getFileName().equals(sinkBean.getFileName());
+        }
+        return bean != null;
+    }
+
+    protected EditText getReferenceEditText() {
+        return (EditText) findViewById(R.id.text_input_reference);
+    }
+
+
+}

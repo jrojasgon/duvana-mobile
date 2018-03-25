@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "974726043628",
+    "firebase_url": "https://toolrepoapp.firebaseio.com",
+    "project_id": "toolrepoapp",
+    "storage_bucket": "toolrepoapp.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:974726043628:android:42ee15d6b06b0620",
+        "android_client_info": {
+          "package_name": "inope.com.toolrepo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "974726043628-kh25gqjq0ertrf5oo4cknju8s522neh1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "inope.com.toolrepo",
+            "certificate_hash": "c7f62f13be41f7cc1e248b0521cfaee7a696bd92"
+          }
+        },
+        {
+          "client_id": "974726043628-e4pood8sajh6v4jvllhdcbsomekv7t3k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBT6TFTQMBSu8lDG37pyFvd-GeGbgTXlsk"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "974726043628-e4pood8sajh6v4jvllhdcbsomekv7t3k.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
